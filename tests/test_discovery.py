@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from snmptrap2mqtt.config import Config
 from snmptrap2mqtt.discovery import (
+    bridge_device_payload,
+    bridge_device_topic,
     bridge_devices_payload,
     bridge_info_payload,
     device_discovery_payload,
@@ -71,6 +73,43 @@ def test_trigger_discovery(config: Config) -> None:
 def test_bridge_payloads(config: Config) -> None:
     info = bridge_info_payload(config)
     assert info["targets"] == ["boiler-switch", "attic-switch"]
+    assert info["listener"]["address"] is None
     devices = bridge_devices_payload(config)
     assert devices[0]["host"] == "192.168.254.250"
     assert devices[0]["model"] == "GS728TPv2"
+
+
+def test_bridge_info_carries_address(config: Config) -> None:
+    info = bridge_info_payload(config, "192.168.1.4")
+    assert info["listener"]["address"] == "192.168.1.4"
+
+
+def test_bridge_device_discovery(config: Config) -> None:
+    topic = bridge_device_topic(config)
+    assert topic == "homeassistant/device/snmptrap2mqtt_bridge/config"
+
+    payload = bridge_device_payload(config, "192.168.1.4")
+    assert payload["dev"]["ids"] == ["snmptrap2mqtt_bridge"]
+    assert payload["dev"]["sw"]  # version stamped on the device
+    # No device-level availability, so `status` can report "off" on the LWT.
+    assert "availability" not in payload
+
+    status = payload["cmps"]["status"]
+    assert status["p"] == "binary_sensor"
+    assert status["device_class"] == "connectivity"
+    assert status["state_topic"] == "snmptrap2mqtt/bridge/state"
+
+    version = payload["cmps"]["version"]
+    assert version["p"] == "sensor"
+    assert version["state_topic"] == "snmptrap2mqtt/bridge/info"
+
+    dest = payload["cmps"]["trap_destination"]
+    assert dest["value_template"] == "{{ value_json.listener.address }}"
+
+
+def test_bridge_device_omits_destination_without_address(config: Config) -> None:
+    payload = bridge_device_payload(config, None)
+    assert "trap_destination" not in payload["cmps"]
+    # Health entities are still present without a resolved address.
+    assert "status" in payload["cmps"]
+    assert "version" in payload["cmps"]

@@ -66,7 +66,7 @@ via environment: `SNMPTRAP2MQTT_CONFIG_MQTT_SERVER=mqtt://host:1883`,
 | Topic | Retained | Payload |
 |---|---|---|
 | `snmptrap2mqtt/bridge/state` | yes (LWT) | `{"state":"online"}` / `{"state":"offline"}` |
-| `snmptrap2mqtt/bridge/info` | yes | version, config summary, target list |
+| `snmptrap2mqtt/bridge/info` | yes | version, config summary, target list, `listener.address` |
 | `snmptrap2mqtt/bridge/devices` | yes | JSON list of configured targets |
 | `snmptrap2mqtt/<target>/trap` | **no** | normalized trap (below) |
 | `snmptrap2mqtt/<target>/availability` | yes | `{"state":"online"}` from the liveness poll |
@@ -94,13 +94,22 @@ v2c semantics (RFC 2576 trap-OID mapping), so consumers see one format.
 
 ## Home Assistant
 
-With `homeassistant.discovery: true`, each configured target appears as an
-MQTT device with an **event entity** (trap stream; extra payload keys become
-attributes) and, when liveness polling is configured, a **connectivity**
-diagnostic sensor. MQTT **device triggers** are published lazily the first
-time each trap type occurs, so trap-driven automations can be built in the
-automation UI. Discovery and availability are replayed whenever HA announces
-itself on `homeassistant/status` (birth message).
+The **bridge itself** always appears in HA as a device named `snmptrap2mqtt`,
+independent of the `homeassistant.discovery` switch below — it reports the
+daemon, not the switch ports, so it never duplicates a consumer's entities. It
+carries the running **version**, a **Status** connectivity sensor (online/off
+via the LWT), a **Targets** count, and a **Trap destination** sensor: the
+routable address (`listener.address` in `bridge/info`) switches should send
+traps to, resolved past a `0.0.0.0` bind-all. A downstream integration can read
+that field to learn where to point trap recipients instead of asking for it.
+
+With `homeassistant.discovery: true`, each configured **target** additionally
+appears as an MQTT device with an **event entity** (trap stream; extra payload
+keys become attributes) and, when liveness polling is configured, a
+**connectivity** diagnostic sensor. MQTT **device triggers** are published
+lazily the first time each trap type occurs, so trap-driven automations can be
+built in the automation UI. Discovery and availability are replayed whenever HA
+announces itself on `homeassistant/status` (birth message).
 
 Traps are best-effort UDP: keep an authoritative polling backstop (netgear_poe
 polls every 30 s) for anything that must not miss a state change.

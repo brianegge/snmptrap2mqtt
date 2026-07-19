@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import re
+import socket
 from typing import Any
 
 import aiomqtt
@@ -13,6 +14,8 @@ import aiomqtt
 from .config import Config, TargetConfig
 from .const import UNKNOWN_EVENT
 from .discovery import (
+    bridge_device_payload,
+    bridge_device_topic,
     bridge_devices_payload,
     bridge_info_payload,
     device_discovery_payload,
@@ -26,6 +29,25 @@ from .liveness import LivenessPoller
 _LOGGER = logging.getLogger(__name__)
 
 RECONNECT_DELAY = 5
+
+
+def resolve_listener_address(config: Config) -> str | None:
+    """The routable IP switches should send traps to.
+
+    A specific ``listener.bind`` is authoritative. Past a 0.0.0.0/:: bind-all,
+    ask the kernel which local address routes toward the MQTT broker — on a
+    flat management LAN that is the interface the switches reach too. UDP
+    connect() sends nothing; it just fixes the source address of the route.
+    """
+    bind = config.listener.bind
+    if bind and bind not in ("0.0.0.0", "::"):
+        return bind
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect((config.mqtt.host, config.mqtt.port))
+            return sock.getsockname()[0]
+    except OSError:
+        return None
 
 
 def normalize_trap(config: Config, event: TrapEvent) -> tuple[str, dict[str, Any]]:
@@ -62,6 +84,7 @@ class Bridge:
         self._pollers: list[LivenessPoller] = []
         self._availability: dict[str, bool] = {}
         self._published_triggers: set[tuple[str, str]] = set()
+        self._address = resolve_listener_address(config)
         self._stopping = asyncio.Event()
 
     # -- topics ------------------------------------------------------------
@@ -189,11 +212,20 @@ class Bridge:
         """Bridge state, info, devices, discovery and availability snapshots."""
         await self._publish(self._state_topic(), {"state": "online"}, retain=True)
         await self._publish(
-            f"{self._base}/bridge/info", bridge_info_payload(self._config), retain=True
+            f"{self._base}/bridge/info",
+            bridge_info_payload(self._config, self._address),
+            retain=True,
         )
         await self._publish(
             f"{self._base}/bridge/devices",
             bridge_devices_payload(self._config),
+            retain=True,
+        )
+        # The daemon's own health device is announced regardless of the target
+        # discovery switch — it reports the bridge, not the switch ports.
+        await self._publish(
+            bridge_device_topic(self._config),
+            bridge_device_payload(self._config, self._address),
             retain=True,
         )
         if self._config.homeassistant.discovery:

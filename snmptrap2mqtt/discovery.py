@@ -22,6 +22,9 @@ ORIGIN = {
     "url": "https://github.com/brianegge/snmptrap2mqtt",
 }
 
+# Stable node id for the bridge daemon's own HA device.
+BRIDGE_NODE = "snmptrap2mqtt_bridge"
+
 
 def object_id(target: TargetConfig) -> str:
     """Stable discovery node id derived from the target host."""
@@ -121,12 +124,92 @@ def trigger_discovery_payload(
     }
 
 
-def bridge_info_payload(config: Config) -> dict[str, Any]:
+def bridge_device_topic(config: Config) -> str:
+    return f"{config.homeassistant.discovery_prefix}/device/{BRIDGE_NODE}/config"
+
+
+def bridge_device_payload(config: Config, address: str | None = None) -> dict[str, Any]:
+    """Retained HA discovery for the bridge daemon itself.
+
+    Surfaces the daemon as a device carrying its version, an up/down
+    connectivity sensor, the configured-target count, and — so the netgear_poe
+    config no longer has to be told by hand — the routable address switches
+    should send traps to. Published unconditionally (independent of the
+    ``homeassistant.discovery`` target-mirroring switch) because it never
+    duplicates the consumer's port entities; it only reports the bridge's own
+    health.
+    """
+    base = config.mqtt.base_topic
+    state_topic = f"{base}/bridge/state"
+    info_topic = f"{base}/bridge/info"
+
+    components: dict[str, Any] = {
+        "status": {
+            "p": "binary_sensor",
+            "unique_id": f"{BRIDGE_NODE}_status",
+            "name": "Status",
+            "device_class": "connectivity",
+            "entity_category": "diagnostic",
+            "state_topic": state_topic,
+            "value_template": "{{ value_json.state }}",
+            "payload_on": "online",
+            "payload_off": "offline",
+        },
+        "version": {
+            "p": "sensor",
+            "unique_id": f"{BRIDGE_NODE}_version",
+            "name": "Version",
+            "entity_category": "diagnostic",
+            "state_topic": info_topic,
+            "value_template": "{{ value_json.version }}",
+        },
+        "targets": {
+            "p": "sensor",
+            "unique_id": f"{BRIDGE_NODE}_targets",
+            "name": "Targets",
+            "entity_category": "diagnostic",
+            "state_class": "measurement",
+            "state_topic": info_topic,
+            "value_template": "{{ value_json.targets | length }}",
+        },
+    }
+    if address:
+        components["trap_destination"] = {
+            "p": "sensor",
+            "unique_id": f"{BRIDGE_NODE}_trap_destination",
+            "name": "Trap destination",
+            "entity_category": "diagnostic",
+            "icon": "mdi:ip-network",
+            "state_topic": info_topic,
+            "value_template": "{{ value_json.listener.address }}",
+        }
+
+    return {
+        "dev": {
+            "ids": [BRIDGE_NODE],
+            "name": "snmptrap2mqtt",
+            "mf": "snmptrap2mqtt",
+            "sw": __version__,
+            "cu": ORIGIN["url"],
+        },
+        "o": ORIGIN,
+        # Availability is carried by the `status` connectivity entity rather
+        # than a device-level `availability` block: gating the device on the
+        # LWT would make `status` go "unavailable" on death instead of "off",
+        # hiding the very signal it exists to show.
+        "cmps": components,
+    }
+
+
+def bridge_info_payload(config: Config, address: str | None = None) -> dict[str, Any]:
     return {
         "version": __version__,
         "mqtt": {"server": config.mqtt.server, "base_topic": config.mqtt.base_topic},
         "listener": {
             "bind": config.listener.bind,
+            # The routable address switches should target, resolved past a
+            # 0.0.0.0 bind-all; null if it could not be determined.
+            "address": address,
             "port": config.listener.port,
             "communities": len(config.listener.communities),
         },
