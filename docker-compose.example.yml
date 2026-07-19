@@ -7,7 +7,9 @@
 #   ports: ["162:1162/udp"]
 services:
   snmptrap2mqtt:
-    build: .
+    image: ghcr.io/brianegge/snmptrap2mqtt:latest
+    # Or build locally instead of pulling: comment out `image:` and use
+    # build: .
     container_name: snmptrap2mqtt
     restart: unless-stopped
     network_mode: host

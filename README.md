@@ -34,7 +34,11 @@ mosquitto_sub -h 192.168.254.30 -t 'snmptrap2mqtt/#' -v
 
 ### Docker
 
+A multi-arch image (amd64/arm64) is published to GHCR on every push to `main`
+and on version tags:
+
 ```sh
+docker pull ghcr.io/brianegge/snmptrap2mqtt:latest
 docker compose up -d    # see docker-compose.example.yml
 ```
 
