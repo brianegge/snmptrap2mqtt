@@ -1,0 +1,32 @@
+# Bare-metal alternative to Docker. Install:
+#   sudo useradd -r -s /usr/sbin/nologin snmptrap2mqtt
+#   sudo mkdir -p /opt/snmptrap2mqtt && cd /opt/snmptrap2mqtt
+#   sudo python3 -m venv .venv && sudo .venv/bin/pip install snmptrap2mqtt  # or the repo
+#   sudo mkdir -p /etc/snmptrap2mqtt && sudo cp config.example.yaml /etc/snmptrap2mqtt/config.yaml
+#   sudo chown root:snmptrap2mqtt /etc/snmptrap2mqtt/config.yaml && sudo chmod 640 "$_"
+#   sudo cp systemd/snmptrap2mqtt.service /etc/systemd/system/
+#   sudo systemctl enable --now snmptrap2mqtt
+
+[Unit]
+Description=snmptrap2mqtt SNMP trap to MQTT bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/snmptrap2mqtt/.venv/bin/snmptrap2mqtt -c /etc/snmptrap2mqtt/config.yaml
+# A dedicated user (not DynamicUser) so the 640 config with MQTT credentials
+# can be group-owned by the service.
+User=snmptrap2mqtt
+Group=snmptrap2mqtt
+# Binding UDP 162 without running as root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
