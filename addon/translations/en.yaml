@@ -1,0 +1,35 @@
+---
+configuration:
+  mqtt_server:
+    name: MQTT broker URL
+    description: e.g. mqtt://core-mosquitto:1883 (or mqtts:// for TLS).
+  mqtt_username:
+    name: MQTT username
+    description: Leave blank if your broker allows anonymous access.
+  mqtt_password:
+    name: MQTT password
+    description: Leave blank if your broker allows anonymous access.
+  base_topic:
+    name: Base topic
+    description: MQTT topic root for the bridge (default snmptrap2mqtt).
+  discovery:
+    name: Home Assistant discovery
+    description: >-
+      Publish MQTT discovery for each target. Turn off if another integration
+      already represents these devices.
+  listener_port:
+    name: Trap listener port
+    description: UDP port to receive SNMP traps on (default 162).
+  communities:
+    name: SNMP communities
+    description: Accepted v1/v2c community strings. Leave empty to accept any.
+  targets:
+    name: Known switches
+    description: >-
+      Match traps to a device by its source IP. Unknown senders are still
+      published, but without discovery.
+  log_level:
+    name: Log level
+    description: Verbosity of the add-on log.
+network:
+  162/udp: SNMP trap listener (v1/v2c)

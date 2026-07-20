@@ -4,4 +4,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 dist/
-config.yaml
+# Local runtime config only — the add-on manifest (addon/config.yaml) is tracked.
+/config.yaml

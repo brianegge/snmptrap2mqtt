@@ -48,6 +48,15 @@ UDP 162 is privileged. Either run with host networking plus
 
 A systemd alternative is in `systemd/snmptrap2mqtt.service`.
 
+### Home Assistant add-on
+
+On **Supervised / Home Assistant OS** installs you can run the bridge as an
+add-on (the same GHCR image — no rebuild): Settings → Add-ons → Add-on Store →
+⋮ → **Repositories**, add `https://github.com/brianegge/snmptrap2mqtt`, then
+install **snmptrap2mqtt** and configure it in the UI. See [`addon/DOCS.md`](addon/DOCS.md).
+The image detects the add-on's `/data/options.json` and configures itself from
+it; standalone runs keep reading `config.yaml`.
+
 ## Configuration
 
 See [`config.example.yaml`](config.example.yaml). Every key can be overridden

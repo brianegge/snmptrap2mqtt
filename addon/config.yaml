@@ -1,0 +1,48 @@
+---
+# Home Assistant add-on manifest. Reuses the prebuilt multi-arch image from
+# GHCR (no build) — `version` must match a published image tag, so it tracks
+# the project version and its v* release.
+name: snmptrap2mqtt
+slug: snmptrap2mqtt
+version: "0.2.0"
+description: SNMP trap to MQTT bridge with Home Assistant discovery
+url: https://github.com/brianegge/snmptrap2mqtt
+image: ghcr.io/brianegge/snmptrap2mqtt
+arch:
+  - amd64
+  - aarch64
+init: false
+# Traps arrive as UDP datagrams whose source address identifies the switch;
+# host networking keeps that source IP intact (a bridged NAT would rewrite it)
+# and lets the bridge bind the privileged trap port directly.
+host_network: true
+ports:
+  162/udp: 162
+ports_description:
+  162/udp: SNMP trap listener (v1/v2c)
+options:
+  mqtt_server: mqtt://core-mosquitto:1883
+  base_topic: snmptrap2mqtt
+  discovery: true
+  listener_port: 162
+  communities:
+    - public
+  targets:
+    - name: example-switch
+      host: 192.168.1.2
+  log_level: info
+schema:
+  mqtt_server: str
+  mqtt_username: str?
+  mqtt_password: password?
+  base_topic: str
+  discovery: bool
+  listener_port: port
+  communities:
+    - str
+  targets:
+    - name: str
+      host: str
+      manufacturer: str?
+      model: str?
+  log_level: list(debug|info|warning|error)?

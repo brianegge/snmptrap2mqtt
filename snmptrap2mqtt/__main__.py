@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .addon import OPTIONS_PATH, config_from_options, load_options
 from .bridge import Bridge
 from .config import load_config
 
@@ -44,16 +45,36 @@ async def _run(bridge: Bridge) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    config_path = args.config
+
+    # Add-on mode: no explicit -c, but HA left options at /data/options.json.
+    addon_options: dict | None = None
+    if config_path is None and OPTIONS_PATH.is_file():
+        try:
+            addon_options = load_options()
+        except (OSError, ValueError) as err:
+            logging.basicConfig(level=logging.ERROR)
+            _LOGGER.error("Could not read add-on options: %s", err)
+            return 2
+
+    debug = args.debug or (
+        isinstance(addon_options, dict)
+        and str(addon_options.get("log_level", "")).lower() == "debug"
+    )
     logging.basicConfig(
-        level=logging.DEBUG if args.debug else logging.INFO,
+        level=logging.DEBUG if debug else logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     )
-    config_path = args.config
-    if config_path is None and Path("config.yaml").is_file():
+
+    if config_path is None and addon_options is None and Path("config.yaml").is_file():
         config_path = Path("config.yaml")
 
     try:
-        config = load_config(config_path)
+        config = (
+            config_from_options(addon_options)
+            if addon_options is not None
+            else load_config(config_path)
+        )
     except Exception as err:
         _LOGGER.error("Invalid configuration: %s", err)
         return 2
