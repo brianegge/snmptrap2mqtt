@@ -1,12 +1,17 @@
 # snmptrap2mqtt
 
-An SNMP trap → MQTT bridge in the spirit of
-[zigbee2mqtt](https://www.zigbee2mqtt.io/): a small daemon that listens for
-SNMPv1/v2c traps on UDP 162, normalizes them to JSON, and publishes them to an
-MQTT broker with Home Assistant MQTT discovery. It moves trap reception off
-the Home Assistant host (privileged port, container networking, single
-consumer) onto any box on the network, and captures **which device sent each
-trap** from the UDP source address.
+An SNMP trap → MQTT bridge: a small daemon that listens for SNMPv1/v2c traps on
+UDP 162, normalizes them to JSON, and publishes them to an MQTT broker with Home
+Assistant MQTT discovery. It moves trap reception off the Home Assistant host
+(privileged port, container networking, single consumer) onto any box on the
+network, and captures **which device sent each trap** from the UDP source
+address.
+
+It's built to pair with the
+[homeassistant-netgear-poe](https://github.com/brianegge/homeassistant-netgear-poe)
+integration: the bridge delivers instant link/PoE trap events that the
+integration applies to its switch entities, so changes show up immediately
+instead of waiting for the next poll. It works fine standalone too.
 
 ```
 switches ──UDP 162 traps──► snmptrap2mqtt ──MQTT──► broker ──► Home Assistant
