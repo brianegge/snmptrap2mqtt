@@ -4,7 +4,7 @@
 # the project version and its v* release.
 name: snmptrap2mqtt
 slug: snmptrap2mqtt
-version: "0.2.0"
+version: "0.2.1"
 description: SNMP trap to MQTT bridge with Home Assistant discovery
 url: https://github.com/brianegge/snmptrap2mqtt
 image: ghcr.io/brianegge/snmptrap2mqtt
