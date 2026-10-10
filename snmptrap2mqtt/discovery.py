@@ -65,7 +65,8 @@ def device_discovery_payload(config: Config, target: TargetConfig) -> dict[str, 
             "name": "Trap",
             "state_topic": trap_topic,
             "event_types": event_types,
-            "device_class": None,
+            # No device_class: HA's event platform accepts only doorbell,
+            # button or motion, and rejects an explicit null.
             "json_attributes_topic": trap_topic,
         }
     }

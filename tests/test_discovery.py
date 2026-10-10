@@ -33,6 +33,8 @@ def test_device_discovery_with_liveness(config: Config) -> None:
     assert "linkDown" in trap["event_types"]
     assert "poePortChange" in trap["event_types"]
     assert "unknown" in trap["event_types"]
+    # HA rejects "device_class": null on an event entity.
+    assert "device_class" not in trap
 
     connectivity = payload["cmps"]["connectivity"]
     assert connectivity["p"] == "binary_sensor"
