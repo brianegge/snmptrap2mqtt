@@ -10,11 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: pip install -e '.[dev]'
+      # Hash-checked install from uv.lock; --no-build takes dependencies as
+      # wheels only, so no third-party setup script runs.
+      - run: uv sync --locked --extra dev --no-build
       - name: Ruff
-        run: ruff check .
+        run: uv run --no-sync ruff check .
       - name: Tests
-        run: pytest -q
+        run: uv run --no-sync pytest -q

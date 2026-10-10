@@ -15,9 +15,8 @@ on:
   # Manual re-run for the current version; a no-op if it is already tagged.
   workflow_dispatch:
 
-permissions:
-  contents: write # create the tag and release
-  actions: write # dispatch docker.yml
+# Nothing by default; each job asks for what it needs.
+permissions: {}
 
 concurrency:
   group: release
@@ -27,18 +26,25 @@ jobs:
   # Same gate docker.yml uses, so a commit that fails tests is never tagged.
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: pip install -e '.[dev]'
-      - run: ruff check .
-      - run: pytest -q
+      # Hash-checked install from uv.lock; --no-build takes dependencies as
+      # wheels only, so no third-party setup script runs.
+      - run: uv sync --locked --extra dev --no-build
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync pytest -q
 
   release:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag and release
+      actions: write # dispatch docker.yml
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
