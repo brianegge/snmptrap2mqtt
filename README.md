@@ -27,7 +27,7 @@ see [dchesterton/snmp2mqtt](https://github.com/dchesterton/snmp2mqtt).
 
 ```sh
 pip install .
-cp config.example.yaml config.yaml   # edit broker/targets
+cp example-config.yaml config.yaml   # edit broker/targets
 snmptrap2mqtt -c config.yaml
 ```
 
@@ -64,7 +64,7 @@ it; standalone runs keep reading `config.yaml`.
 
 ## Configuration
 
-See [`config.example.yaml`](config.example.yaml). Every key can be overridden
+See [`example-config.yaml`](example-config.yaml). Every key can be overridden
 via environment: `SNMPTRAP2MQTT_CONFIG_MQTT_SERVER=mqtt://host:1883`,
 `SNMPTRAP2MQTT_CONFIG_LISTENER_PORT=1162`, etc.
 

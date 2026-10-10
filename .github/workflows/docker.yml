@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  # release.yml dispatches this on the new v* tag. A tag created with the
+  # workflow GITHUB_TOKEN does not fire `push: tags` (GitHub suppresses runs
+  # from that token to prevent loops), but workflow_dispatch is exempt -- and
+  # dispatching on the tag ref gives metadata-action refs/tags/vX.Y.Z, so the
+  # semver rules below publish :X.Y.Z exactly as a hand-pushed tag would.
+  workflow_dispatch:
 
 jobs:
   # Gate the image on the same checks CI runs, so a broken build is never

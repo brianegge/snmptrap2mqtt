@@ -2,7 +2,7 @@
 #   sudo useradd -r -s /usr/sbin/nologin snmptrap2mqtt
 #   sudo mkdir -p /opt/snmptrap2mqtt && cd /opt/snmptrap2mqtt
 #   sudo python3 -m venv .venv && sudo .venv/bin/pip install snmptrap2mqtt  # or the repo
-#   sudo mkdir -p /etc/snmptrap2mqtt && sudo cp config.example.yaml /etc/snmptrap2mqtt/config.yaml
+#   sudo mkdir -p /etc/snmptrap2mqtt && sudo cp example-config.yaml /etc/snmptrap2mqtt/config.yaml
 #   sudo chown root:snmptrap2mqtt /etc/snmptrap2mqtt/config.yaml && sudo chmod 640 "$_"
 #   sudo cp systemd/snmptrap2mqtt.service /etc/systemd/system/
 #   sudo systemctl enable --now snmptrap2mqtt

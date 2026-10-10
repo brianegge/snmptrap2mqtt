@@ -1,0 +1,99 @@
+name: Release
+
+# Tag, release and publish the versioned image whenever the add-on version
+# changes on main.
+#
+# Home Assistant's Supervisor reads `version` from addon/config.yaml on main and
+# pulls ghcr.io/<repo>:<version>. docker.yml only publishes that tag for a v*
+# git tag, so a version bump merged without tagging makes every install offer an
+# update it cannot download ("[404] manifest unknown" in the Supervisor log,
+# "An unknown error occurred with app ..." in the UI). That happened with 0.2.1.
+on:
+  push:
+    branches: [main]
+    paths: [addon/config.yaml]
+  # Manual re-run for the current version; a no-op if it is already tagged.
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the tag and release
+  actions: write # dispatch docker.yml
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Same gate docker.yml uses, so a commit that fails tests is never tagged.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e '.[dev]'
+      - run: ruff check .
+      - run: pytest -q
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        name: Read add-on version
+        run: |
+          # Top-level key only, with or without single/double quotes.
+          v=$(sed -nE "s/^version:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?.*/\1/p" addon/config.yaml | head -1)
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=addon/config.yaml::version '$v' is not X.Y.Z"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - id: exists
+        name: Skip if already tagged
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          # A tag pushed by hand already triggered docker.yml via `push: tags`.
+          if gh api "repos/$REPO/git/ref/tags/v$V" >/dev/null 2>&1; then
+            echo "v$V is already tagged; nothing to do"
+            echo "tagged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tagged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release
+        if: steps.exists.outputs.tagged == 'false'
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          # Title after the PR that bumped the version, minus any "(vX.Y.Z)"
+          # suffix it already carries; plain "vX.Y.Z" if pushed directly.
+          pr_title=$(gh api "repos/$REPO/commits/$GITHUB_SHA/pulls" --jq '.[0].title // empty' 2>/dev/null || true)
+          pr_title=$(sed -E 's/[[:space:]]*\(v[0-9]+\.[0-9]+\.[0-9]+\)$//' <<<"$pr_title")
+          title="v$V${pr_title:+ — $pr_title}"
+
+          gh api "repos/$REPO/releases/generate-notes" \
+            -f tag_name="v$V" -f target_commitish="$GITHUB_SHA" --jq .body > notes.md
+          # shellcheck disable=SC2016 # literal Markdown backticks, not a substitution
+          printf '\n**Image:** `ghcr.io/%s:%s`\n' "$REPO" "$V" >> notes.md
+
+          gh release create "v$V" --repo "$REPO" --target "$GITHUB_SHA" \
+            --title "$title" --notes-file notes.md
+
+      - name: Build and publish the versioned image
+        if: steps.exists.outputs.tagged == 'false'
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          # The tag above was created with GITHUB_TOKEN, so it did NOT trigger
+          # docker.yml's `push: tags` -- dispatch it on the tag ref instead.
+          gh workflow run docker.yml --repo "$REPO" --ref "v$V"
+          echo "Dispatched docker.yml on v$V; it publishes ghcr.io/$REPO:$V"
