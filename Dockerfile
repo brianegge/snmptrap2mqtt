@@ -1,9 +1,32 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.12.20 /uv /bin/uv
+
+# Use the image's Python, and copy (not hardlink) out of the cache mount.
+ENV UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
+
+# Dependencies first, from uv.lock, so code changes reuse this layer.
+# --no-build takes them as wheels only, the same as CI.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-build --no-install-project --no-editable
+
+COPY pyproject.toml uv.lock README.md ./
 COPY snmptrap2mqtt ./snmptrap2mqtt
-RUN pip install --no-cache-dir .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-build --no-editable
+
+
+FROM python:3.12-slim
+
+# Only the venv ships; uv and the source tree stay in the builder.
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+WORKDIR /app
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
