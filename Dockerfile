@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.20 /uv /bin/uv
 
@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-build --no-editable
 
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Only the venv ships; uv and the source tree stay in the builder.
 COPY --from=builder /app/.venv /app/.venv
